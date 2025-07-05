@@ -172,7 +172,11 @@ def create_csv_file(film_data, cast_data):
     # Записываем основную информацию
     output.write("=== ОСНОВНАЯ ИНФОРМАЦИЯ ===\n")
     for key, value in film_data.items():
-        output.write(f"{key},{value}\n")
+        # Экранируем запятые и кавычки в значениях
+        value_str = str(value).replace('"', '""')
+        if ',' in value_str or '\n' in value_str:
+            value_str = f'"{value_str}"'
+        output.write(f"{key},{value_str}\n")
     
     output.write("\n=== АКТЕРЫ И СЪЕМОЧНАЯ ГРУППА ===\n")
     output.write("Имя,ID\n")
@@ -180,14 +184,54 @@ def create_csv_file(film_data, cast_data):
     for line in cast_data:
         if ';' in line:
             name, staff_id = line.split(';', 1)
-            output.write(f"{name.strip()},{staff_id.strip()}\n")
+            name = name.strip().replace('"', '""')
+            staff_id = staff_id.strip()
+            # Экранируем запятые в именах
+            if ',' in name:
+                name = f'"{name}"'
+            output.write(f"{name},{staff_id}\n")
         else:
-            output.write(f"{line.strip()},\n")
+            name = line.strip().replace('"', '""')
+            if ',' in name:
+                name = f'"{name}"'
+            output.write(f"{name},\n")
     
     content = output.getvalue()
     output.close()
     
-    return io.BytesIO(content.encode('utf-8'))
+    # Кодируем в UTF-8 с BOM для корректного отображения в Excel
+    return io.BytesIO(('\ufeff' + content).encode('utf-8'))
+
+def create_simple_csv_file(film_data, cast_data):
+    """Создает простой CSV файл для универсального использования"""
+    output = io.StringIO()
+    
+    # Создаем DataFrame для основной информации
+    df_main = pd.DataFrame([film_data])
+    
+    # Создаем DataFrame для актеров
+    cast_list = []
+    for line in cast_data:
+        if ';' in line:
+            name, staff_id = line.split(';', 1)
+            cast_list.append({'Имя': name.strip(), 'ID': staff_id.strip()})
+        else:
+            cast_list.append({'Имя': line.strip(), 'ID': ''})
+    
+    df_cast = pd.DataFrame(cast_list)
+    
+    # Записываем основную информацию
+    output.write("=== ОСНОВНАЯ ИНФОРМАЦИЯ ===\n")
+    df_main.to_csv(output, index=False, encoding='utf-8')
+    
+    output.write("\n=== АКТЕРЫ И СЪЕМОЧНАЯ ГРУППА ===\n")
+    df_cast.to_csv(output, index=False, encoding='utf-8')
+    
+    content = output.getvalue()
+    output.close()
+    
+    # Возвращаем с UTF-8 BOM для корректного отображения
+    return io.BytesIO(('\ufeff' + content).encode('utf-8'))
 
 # Инициализация сессии
 if 'film_data' not in st.session_state:
@@ -351,19 +395,38 @@ with col2:
                     st.info("Попробуйте скачать CSV файл")
         
         with col_export2:
-            if st.button("📄 Скачать CSV файл"):
-                try:
-                    csv_file = create_csv_file(st.session_state.film_data, st.session_state.cast_data)
-                    
-                    st.download_button(
-                        label="⬇️ Скачать CSV",
-                        data=csv_file,
-                        file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv"
-                    )
-                    
-                except Exception as e:
-                    st.error(f"Ошибка при создании CSV файла: {e}")
+            # Создаем два варианта CSV
+            csv_col1, csv_col2 = st.columns(2)
+            
+            with csv_col1:
+                if st.button("📄 CSV (для Excel)"):
+                    try:
+                        csv_file = create_csv_file(st.session_state.film_data, st.session_state.cast_data)
+                        
+                        st.download_button(
+                            label="⬇️ Скачать CSV",
+                            data=csv_file,
+                            file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                        
+                    except Exception as e:
+                        st.error(f"Ошибка при создании CSV файла: {e}")
+            
+            with csv_col2:
+                if st.button("📋 CSV (простой)"):
+                    try:
+                        csv_file = create_simple_csv_file(st.session_state.film_data, st.session_state.cast_data)
+                        
+                        st.download_button(
+                            label="⬇️ Скачать CSV",
+                            data=csv_file,
+                            file_name=f"film_{film_id}_simple_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                        
+                    except Exception as e:
+                        st.error(f"Ошибка при создании простого CSV файла: {e}")
     else:
         st.info("👈 Введите ID фильма и нажмите 'Получить информацию'")
 
