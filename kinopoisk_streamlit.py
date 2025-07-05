@@ -139,68 +139,136 @@ def create_excel_file(film_data, cast_data):
     output = io.BytesIO()
     
     try:
+        # Очищаем данные от проблемных символов
+        cleaned_film_data = {}
+        for key, value in film_data.items():
+            if isinstance(value, str):
+                # Удаляем или заменяем проблемные символы
+                cleaned_value = value.replace('\x00', '').replace('\ufeff', '')
+                # Ограничиваем длину для Excel (максимум 32767 символов в ячейке)
+                if len(cleaned_value) > 32000:
+                    cleaned_value = cleaned_value[:32000] + "..."
+                cleaned_film_data[key] = cleaned_value
+            else:
+                cleaned_film_data[key] = value
+        
         # Основные данные фильма
-        df_main = pd.DataFrame([film_data])
+        df_main = pd.DataFrame([cleaned_film_data])
         
         # Данные о касте
         cast_list = []
         for line in cast_data:
             if ';' in line:
                 name, staff_id = line.split(';', 1)
-                cast_list.append({'Имя': name.strip(), 'ID': staff_id.strip()})
+                # Очищаем имя от проблемных символов
+                clean_name = name.strip().replace('\x00', '').replace('\ufeff', '')
+                if len(clean_name) > 255:  # Ограничение для имен
+                    clean_name = clean_name[:255]
+                cast_list.append({'Имя': clean_name, 'ID': staff_id.strip()})
             else:
-                cast_list.append({'Имя': line.strip(), 'ID': ''})
+                clean_name = line.strip().replace('\x00', '').replace('\ufeff', '')
+                if len(clean_name) > 255:
+                    clean_name = clean_name[:255]
+                cast_list.append({'Имя': clean_name, 'ID': ''})
         
         df_cast = pd.DataFrame(cast_list)
         
-        # Записываем в Excel с использованием xlsxwriter
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Записываем в Excel с дополнительными настройками
+        with pd.ExcelWriter(output, engine='xlsxwriter', options={'strings_to_urls': False}) as writer:
+            # Записываем основную информацию
             df_main.to_excel(writer, sheet_name='Основная информация', index=False)
+            
+            # Записываем данные о касте
             df_cast.to_excel(writer, sheet_name='Актеры и съемочная группа', index=False)
+            
+            # Получаем workbook и worksheet для настройки
+            workbook = writer.book
+            worksheet_main = writer.sheets['Основная информация']
+            worksheet_cast = writer.sheets['Актеры и съемочная группа']
+            
+            # Настраиваем ширину столбцов
+            worksheet_main.set_column('A:A', 25)  # Названия полей
+            worksheet_main.set_column('B:B', 50)  # Значения
+            
+            worksheet_cast.set_column('A:A', 40)  # Имена
+            worksheet_cast.set_column('B:B', 15)  # ID
+            
+            # Добавляем форматирование заголовков
+            header_format = workbook.add_format({
+                'bold': True,
+                'bg_color': '#D3D3D3',
+                'border': 1
+            })
+            
+            # Применяем форматирование к заголовкам
+            for col_num, value in enumerate(df_main.columns.values):
+                worksheet_main.write(0, col_num, value, header_format)
+            
+            for col_num, value in enumerate(df_cast.columns.values):
+                worksheet_cast.write(0, col_num, value, header_format)
         
         output.seek(0)
         return output
         
-    except ImportError:
-        # Если xlsxwriter недоступен, создаем CSV
-        return create_csv_file(film_data, cast_data)
+    except Exception as e:
+        # Если произошла ошибка, возвращаем улучшенную версию CSV
+        st.error(f"Ошибка при создании Excel файла: {e}")
+        return create_improved_csv_file(film_data, cast_data)
 
-def create_csv_file(film_data, cast_data):
-    """Создает CSV файл с данными о фильме как альтернатива Excel"""
-    output = io.StringIO()
+def create_improved_csv_file(film_data, cast_data):
+    """Создает улучшенный CSV файл как альтернатива Excel"""
+    output = io.BytesIO()
     
-    # Записываем основную информацию
-    output.write("=== ОСНОВНАЯ ИНФОРМАЦИЯ ===\n")
-    for key, value in film_data.items():
-        # Экранируем запятые и кавычки в значениях
-        value_str = str(value).replace('"', '""')
-        if ',' in value_str or '\n' in value_str:
-            value_str = f'"{value_str}"'
-        output.write(f"{key},{value_str}\n")
+    # Создаем временный файл в памяти
+    temp_output = io.StringIO()
     
-    output.write("\n=== АКТЕРЫ И СЪЕМОЧНАЯ ГРУППА ===\n")
-    output.write("Имя,ID\n")
-    
-    for line in cast_data:
-        if ';' in line:
-            name, staff_id = line.split(';', 1)
-            name = name.strip().replace('"', '""')
-            staff_id = staff_id.strip()
-            # Экранируем запятые в именах
-            if ',' in name:
-                name = f'"{name}"'
-            output.write(f"{name},{staff_id}\n")
-        else:
-            name = line.strip().replace('"', '""')
-            if ',' in name:
-                name = f'"{name}"'
-            output.write(f"{name},\n")
-    
-    content = output.getvalue()
-    output.close()
-    
-    # Кодируем в UTF-8 с BOM для корректного отображения в Excel
-    return io.BytesIO(('\ufeff' + content).encode('utf-8'))
+    try:
+        # Очищаем данные
+        cleaned_film_data = {}
+        for key, value in film_data.items():
+            if isinstance(value, str):
+                cleaned_value = value.replace('\x00', '').replace('\ufeff', '').replace('\n', ' ').replace('\r', ' ')
+                cleaned_film_data[key] = cleaned_value
+            else:
+                cleaned_film_data[key] = value
+        
+        # Создаем DataFrame для основной информации
+        df_main = pd.DataFrame([cleaned_film_data])
+        
+        # Создаем DataFrame для актеров
+        cast_list = []
+        for line in cast_data:
+            if ';' in line:
+                name, staff_id = line.split(';', 1)
+                clean_name = name.strip().replace('\x00', '').replace('\ufeff', '').replace('\n', ' ').replace('\r', ' ')
+                cast_list.append({'Имя': clean_name, 'ID': staff_id.strip()})
+            else:
+                clean_name = line.strip().replace('\x00', '').replace('\ufeff', '').replace('\n', ' ').replace('\r', ' ')
+                cast_list.append({'Имя': clean_name, 'ID': ''})
+        
+        df_cast = pd.DataFrame(cast_list)
+        
+        # Записываем в CSV с правильной кодировкой
+        temp_output.write("=== ОСНОВНАЯ ИНФОРМАЦИЯ ===\n")
+        df_main.to_csv(temp_output, index=False, encoding='utf-8', sep=';', quoting=1)
+        
+        temp_output.write("\n=== АКТЕРЫ И СЪЕМОЧНАЯ ГРУППА ===\n")
+        df_cast.to_csv(temp_output, index=False, encoding='utf-8', sep=';', quoting=1)
+        
+        # Получаем содержимое и кодируем с BOM для Excel
+        content = temp_output.getvalue()
+        temp_output.close()
+        
+        # Возвращаем байтовый поток с правильной кодировкой
+        final_content = '\ufeff' + content
+        output.write(final_content.encode('utf-8'))
+        output.seek(0)
+        
+        return output
+        
+    except Exception as e:
+        st.error(f"Ошибка при создании CSV файла: {e}")
+        return None
 
 def create_simple_csv_file(film_data, cast_data):
     """Создает простой CSV файл для универсального использования"""
@@ -381,15 +449,23 @@ with col2:
         with col_export1:
             if st.button("📊 Скачать Excel файл"):
                 try:
-                    excel_file = create_excel_file(st.session_state.film_data, st.session_state.cast_data)
-                    
-                    st.download_button(
-                        label="⬇️ Скачать Excel",
-                        data=excel_file,
-                        file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
+                    with st.spinner("Создание Excel файла..."):
+                        excel_file = create_excel_file(st.session_state.film_data, st.session_state.cast_data)
+                        
+                        if excel_file:
+                            filename = f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                            
+                            st.download_button(
+                                label="⬇️ Скачать Excel",
+                                data=excel_file,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="excel_download"
+                            )
+                            st.success("Excel файл готов к скачиванию!")
+                        else:
+                            st.error("Не удалось создать Excel файл")
+                            
                 except Exception as e:
                     st.error(f"Ошибка при создании Excel файла: {e}")
                     st.info("Попробуйте скачать CSV файл")
@@ -401,32 +477,68 @@ with col2:
             with csv_col1:
                 if st.button("📄 CSV (для Excel)"):
                     try:
-                        csv_file = create_csv_file(st.session_state.film_data, st.session_state.cast_data)
-                        
-                        st.download_button(
-                            label="⬇️ Скачать CSV",
-                            data=csv_file,
-                            file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv"
-                        )
-                        
+                        with st.spinner("Создание CSV файла..."):
+                            csv_file = create_improved_csv_file(st.session_state.film_data, st.session_state.cast_data)
+                            
+                            if csv_file:
+                                filename = f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                                
+                                st.download_button(
+                                    label="⬇️ Скачать CSV",
+                                    data=csv_file,
+                                    file_name=filename,
+                                    mime="text/csv",
+                                    key="csv_download_1"
+                                )
+                                st.success("CSV файл готов к скачиванию!")
+                            else:
+                                st.error("Не удалось создать CSV файл")
+                                
                     except Exception as e:
                         st.error(f"Ошибка при создании CSV файла: {e}")
             
             with csv_col2:
                 if st.button("📋 CSV (простой)"):
                     try:
-                        csv_file = create_simple_csv_file(st.session_state.film_data, st.session_state.cast_data)
-                        
-                        st.download_button(
-                            label="⬇️ Скачать CSV",
-                            data=csv_file,
-                            file_name=f"film_{film_id}_simple_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv"
-                        )
-                        
+                        with st.spinner("Создание простого CSV файла..."):
+                            csv_file = create_simple_csv_file(st.session_state.film_data, st.session_state.cast_data)
+                            
+                            if csv_file:
+                                filename = f"film_{film_id}_simple_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                                
+                                st.download_button(
+                                    label="⬇️ Скачать CSV",
+                                    data=csv_file,
+                                    file_name=filename,
+                                    mime="text/csv",
+                                    key="csv_download_2"
+                                )
+                                st.success("Простой CSV файл готов к скачиванию!")
+                            else:
+                                st.error("Не удалось создать простой CSV файл")
+                                
                     except Exception as e:
                         st.error(f"Ошибка при создании простого CSV файла: {e}")
+        
+        # Дополнительные советы по экспорту
+        with st.expander("💡 Советы по экспорту"):
+            st.markdown("""
+            **Если возникают проблемы с Excel файлом:**
+            1. Попробуйте скачать CSV файл вместо Excel
+            2. При открытии CSV в Excel выберите разделитель "точка с запятой" (;)
+            3. Убедитесь, что у вас установлены все необходимые библиотеки
+            
+            **Форматы файлов:**
+            - **Excel**: Удобен для просмотра и редактирования
+            - **CSV для Excel**: Совместим с Excel, использует точку с запятой
+            - **CSV простой**: Универсальный формат для любых программ
+            
+            **Для установки недостающих библиотек:**
+            ```
+            pip install xlsxwriter openpyxl
+            ```
+            """)
+        
     else:
         st.info("👈 Введите ID фильма и нажмите 'Получить информацию'")
 
