@@ -55,12 +55,7 @@ def format_duration(duration):
         minutes = int(duration)
         if minutes <= 0:
             return '-'
-        hours = minutes // 60
-        mins = minutes % 60
-        if hours > 0:
-            return f"{minutes} мин ({hours}ч {mins}м)"
-        else:
-            return f"{minutes} мин"
+        return str(minutes)
     except (ValueError, TypeError):
         return str(duration) if duration else '-'
 
@@ -374,7 +369,7 @@ with col1:
                         'Рейтинг IMDB': safe(data.get('ratingImdb')),
                         'Рейтинг Кинопоиска': safe(data.get('ratingKinopoisk')),
                         'Описание': safe(data.get('description')),
-                        'Продолжительность': format_duration(data.get('filmLength'))
+                        'Продолжительность (мин)': format_duration(data.get('filmLength'))
                     }
                     
                     # Касса
@@ -430,7 +425,7 @@ with col2:
             st.metric("Жанры", st.session_state.film_data.get('Жанры', '-'))
         
         with col_extra2:
-            st.metric("Продолжительность", st.session_state.film_data.get('Продолжительность', '-'))
+            st.metric("Продолжительность (мин)", st.session_state.film_data.get('Продолжительность (мин)', '-'))
         
         # Описание
         st.subheader("📝 Описание")
