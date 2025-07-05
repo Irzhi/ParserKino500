@@ -425,22 +425,17 @@ with col2:
             st.metric("Год", st.session_state.film_data.get('Год', '-'))
             st.metric("Рейтинг IMDB", st.session_state.film_data.get('Рейтинг IMDB', '-'))
             st.metric("Премьера в РФ", st.session_state.film_data.get('Премьера в РФ', '-'))
+            st.metric("Премьера мировая", st.session_state.film_data.get('Премьера мировая', '-'))
         
         with col_info2:
             st.metric("Оригинальное название", st.session_state.film_data.get('Оригинальное название', '-'))
             st.metric("Страна", st.session_state.film_data.get('Страна', '-'))
             st.metric("Рейтинг Кинопоиска", st.session_state.film_data.get('Рейтинг Кинопоиска', '-'))
             st.metric("Кол-во голосов КП", st.session_state.film_data.get('Кол-во голосов КП', '-'))
-            st.metric("Премьера мировая", st.session_state.film_data.get('Премьера мировая', '-'))
-        
-        # Жанры и продолжительность
-        col_extra1, col_extra2 = st.columns(2)
-        
-        with col_extra1:
-            st.metric("Жанры", st.session_state.film_data.get('Жанры', '-'))
-        
-        with col_extra2:
             st.metric("Продолжительность (мин)", st.session_state.film_data.get('Продолжительность (мин)', '-'))
+        
+        # Жанры отдельно на всю ширину
+        st.metric("Жанры", st.session_state.film_data.get('Жанры', '-'))
         
         # Описание
         st.subheader("📝 Описание")
