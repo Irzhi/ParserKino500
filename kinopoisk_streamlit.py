@@ -173,8 +173,8 @@ def create_excel_file(film_data, cast_data):
         
         df_cast = pd.DataFrame(cast_list)
         
-        # Записываем в Excel с дополнительными настройками
-        with pd.ExcelWriter(output, engine='xlsxwriter', options={'strings_to_urls': False}) as writer:
+        # Записываем в Excel с правильными настройками
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             # Записываем основную информацию
             df_main.to_excel(writer, sheet_name='Основная информация', index=False)
             
