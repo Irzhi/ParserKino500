@@ -47,6 +47,23 @@ def format_date(date_str):
     except Exception as e:
         return date_str
 
+def format_duration(duration):
+    """Форматирует продолжительность в минутах"""
+    if not duration or duration == '-' or duration is None:
+        return '-'
+    try:
+        minutes = int(duration)
+        if minutes <= 0:
+            return '-'
+        hours = minutes // 60
+        mins = minutes % 60
+        if hours > 0:
+            return f"{minutes} мин ({hours}ч {mins}м)"
+        else:
+            return f"{minutes} мин"
+    except (ValueError, TypeError):
+        return str(duration) if duration else '-'
+
 def get_film_info(film_id, api_key):
     url = API_URL.format(film_id)
     try:
@@ -354,8 +371,10 @@ with col1:
                         'Год': safe(data.get('year')),
                         'Жанры': safe(', '.join([g['genre'] for g in data.get('genres', [])]) if data.get('genres') else '-'),
                         'Страна': safe(', '.join([c['country'] for c in data.get('countries', []) if c.get('country')])),
+                        'Рейтинг IMDB': safe(data.get('ratingImdb')),
                         'Рейтинг Кинопоиска': safe(data.get('ratingKinopoisk')),
-                        'Описание': safe(data.get('description'))
+                        'Описание': safe(data.get('description')),
+                        'Продолжительность': format_duration(data.get('filmLength'))
                     }
                     
                     # Касса
@@ -395,14 +414,23 @@ with col2:
         with col_info1:
             st.metric("Название (RU)", st.session_state.film_data.get('Название (RU)', '-'))
             st.metric("Год", st.session_state.film_data.get('Год', '-'))
-            st.metric("Рейтинг Кинопоиска", st.session_state.film_data.get('Рейтинг Кинопоиска', '-'))
+            st.metric("Рейтинг IMDB", st.session_state.film_data.get('Рейтинг IMDB', '-'))
             st.metric("Премьера в РФ", st.session_state.film_data.get('Премьера в РФ', '-'))
         
         with col_info2:
             st.metric("Оригинальное название", st.session_state.film_data.get('Оригинальное название', '-'))
             st.metric("Страна", st.session_state.film_data.get('Страна', '-'))
-            st.metric("Жанры", st.session_state.film_data.get('Жанры', '-'))
+            st.metric("Рейтинг Кинопоиска", st.session_state.film_data.get('Рейтинг Кинопоиска', '-'))
             st.metric("Премьера мировая", st.session_state.film_data.get('Премьера мировая', '-'))
+        
+        # Жанры и продолжительность
+        col_extra1, col_extra2 = st.columns(2)
+        
+        with col_extra1:
+            st.metric("Жанры", st.session_state.film_data.get('Жанры', '-'))
+        
+        with col_extra2:
+            st.metric("Продолжительность", st.session_state.film_data.get('Продолжительность', '-'))
         
         # Описание
         st.subheader("📝 Описание")
