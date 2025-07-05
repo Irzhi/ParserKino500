@@ -138,27 +138,56 @@ def create_excel_file(film_data, cast_data):
     """Создает Excel файл с данными о фильме"""
     output = io.BytesIO()
     
-    # Основные данные фильма
-    df_main = pd.DataFrame([film_data])
+    try:
+        # Основные данные фильма
+        df_main = pd.DataFrame([film_data])
+        
+        # Данные о касте
+        cast_list = []
+        for line in cast_data:
+            if ';' in line:
+                name, staff_id = line.split(';', 1)
+                cast_list.append({'Имя': name.strip(), 'ID': staff_id.strip()})
+            else:
+                cast_list.append({'Имя': line.strip(), 'ID': ''})
+        
+        df_cast = pd.DataFrame(cast_list)
+        
+        # Записываем в Excel с использованием xlsxwriter
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_main.to_excel(writer, sheet_name='Основная информация', index=False)
+            df_cast.to_excel(writer, sheet_name='Актеры и съемочная группа', index=False)
+        
+        output.seek(0)
+        return output
+        
+    except ImportError:
+        # Если xlsxwriter недоступен, создаем CSV
+        return create_csv_file(film_data, cast_data)
+
+def create_csv_file(film_data, cast_data):
+    """Создает CSV файл с данными о фильме как альтернатива Excel"""
+    output = io.StringIO()
     
-    # Данные о касте
-    cast_list = []
+    # Записываем основную информацию
+    output.write("=== ОСНОВНАЯ ИНФОРМАЦИЯ ===\n")
+    for key, value in film_data.items():
+        output.write(f"{key},{value}\n")
+    
+    output.write("\n=== АКТЕРЫ И СЪЕМОЧНАЯ ГРУППА ===\n")
+    output.write("Имя,ID\n")
+    
     for line in cast_data:
         if ';' in line:
             name, staff_id = line.split(';', 1)
-            cast_list.append({'Имя': name.strip(), 'ID': staff_id.strip()})
+            output.write(f"{name.strip()},{staff_id.strip()}\n")
         else:
-            cast_list.append({'Имя': line.strip(), 'ID': ''})
+            output.write(f"{line.strip()},\n")
     
-    df_cast = pd.DataFrame(cast_list)
+    content = output.getvalue()
+    output.close()
     
-    # Записываем в Excel
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_main.to_excel(writer, sheet_name='Основная информация', index=False)
-        df_cast.to_excel(writer, sheet_name='Актеры и съемочная группа', index=False)
-    
-    output.seek(0)
-    return output
+    return io.BytesIO(content.encode('utf-8'))
 
 # Инициализация сессии
 if 'film_data' not in st.session_state:
@@ -303,19 +332,38 @@ with col2:
         # Кнопка экспорта
         st.subheader("📥 Экспорт данных")
         
-        if st.button("📊 Скачать Excel файл"):
-            try:
-                excel_file = create_excel_file(st.session_state.film_data, st.session_state.cast_data)
-                
-                st.download_button(
-                    label="⬇️ Скачать Excel",
-                    data=excel_file,
-                    file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-            except Exception as e:
-                st.error(f"Ошибка при создании файла: {e}")
+        col_export1, col_export2 = st.columns(2)
+        
+        with col_export1:
+            if st.button("📊 Скачать Excel файл"):
+                try:
+                    excel_file = create_excel_file(st.session_state.film_data, st.session_state.cast_data)
+                    
+                    st.download_button(
+                        label="⬇️ Скачать Excel",
+                        data=excel_file,
+                        file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                except Exception as e:
+                    st.error(f"Ошибка при создании Excel файла: {e}")
+                    st.info("Попробуйте скачать CSV файл")
+        
+        with col_export2:
+            if st.button("📄 Скачать CSV файл"):
+                try:
+                    csv_file = create_csv_file(st.session_state.film_data, st.session_state.cast_data)
+                    
+                    st.download_button(
+                        label="⬇️ Скачать CSV",
+                        data=csv_file,
+                        file_name=f"film_{film_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                    
+                except Exception as e:
+                    st.error(f"Ошибка при создании CSV файла: {e}")
     else:
         st.info("👈 Введите ID фильма и нажмите 'Получить информацию'")
 
