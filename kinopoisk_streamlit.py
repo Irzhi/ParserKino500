@@ -59,6 +59,19 @@ def format_duration(duration):
     except (ValueError, TypeError):
         return str(duration) if duration else '-'
 
+def format_vote_count(vote_count):
+    """Форматирует количество голосов"""
+    if not vote_count or vote_count == '-' or vote_count is None:
+        return '-'
+    try:
+        count = int(vote_count)
+        if count <= 0:
+            return '-'
+        # Форматируем с разделителями тысяч
+        return f"{count:,}".replace(",", " ")
+    except (ValueError, TypeError):
+        return str(vote_count) if vote_count else '-'
+
 def get_film_info(film_id, api_key):
     url = API_URL.format(film_id)
     try:
@@ -368,6 +381,7 @@ with col1:
                         'Страна': safe(', '.join([c['country'] for c in data.get('countries', []) if c.get('country')])),
                         'Рейтинг IMDB': safe(data.get('ratingImdb')),
                         'Рейтинг Кинопоиска': safe(data.get('ratingKinopoisk')),
+                        'Кол-во голосов КП': format_vote_count(data.get('ratingKinopoiskVoteCount')),
                         'Описание': safe(data.get('description')),
                         'Продолжительность (мин)': format_duration(data.get('filmLength'))
                     }
@@ -416,6 +430,7 @@ with col2:
             st.metric("Оригинальное название", st.session_state.film_data.get('Оригинальное название', '-'))
             st.metric("Страна", st.session_state.film_data.get('Страна', '-'))
             st.metric("Рейтинг Кинопоиска", st.session_state.film_data.get('Рейтинг Кинопоиска', '-'))
+            st.metric("Кол-во голосов КП", st.session_state.film_data.get('Кол-во голосов КП', '-'))
             st.metric("Премьера мировая", st.session_state.film_data.get('Премьера мировая', '-'))
         
         # Жанры и продолжительность
